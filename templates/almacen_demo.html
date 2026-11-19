@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Almacén de Barrio — Sistema POS Profesional (Demo)</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/almacen_demo.css') }}">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220%22%20%220%22%20%22100%22%20%22100%22><text y=%22.9em%22 font-size=%2290%22>🛒</text></svg>">
+</head>
+<body>
+
+    <!-- Banner Superior de Demostración Comercial -->
+    <div class="demo-banner">
+        <div class="banner-content">
+            <span class="badge-demo">MODO DEMOSTRACIÓN</span>
+            <span class="banner-text">Entorno interactivo con datos ficticios para evaluación comercial. Los cambios no afectan ningún sistema real.</span>
+            <button id="btn-reset-demo" class="btn-banner-reset" title="Restablecer base de datos inicial">
+                🔄 Reiniciar Datos de Demo
+            </button>
+        </div>
+    </div>
+
+    <!-- Contenedor Principal de la Aplicación POS -->
+    <div class="app-layout">
+        
+        <!-- SIDEBAR DE NAVEGACIÓN -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="brand-icon">🏪</div>
+                <div class="brand-text">
+                    <h2>ALMACÉN DE BARRIO</h2>
+                    <span class="brand-sub">Sistema POS v0.1.0</span>
+                </div>
+            </div>
+
+            <nav class="sidebar-nav">
+                <button class="nav-item active" data-view="ventas">
+                    <span class="nav-icon">🛒</span>
+                    <span class="nav-label">Ventas / Mostrador</span>
+                    <span class="nav-shortcut">[F2]</span>
+                </button>
+                <button class="nav-item" data-view="productos">
+                    <span class="nav-icon">📦</span>
+                    <span class="nav-label">Productos y Stock</span>
+                </button>
+                <button class="nav-item" data-view="clientes">
+                    <span class="nav-icon">👥</span>
+                    <span class="nav-label">Clientes y Fiados</span>
+                </button>
+                <button class="nav-item" data-view="caja">
+                    <span class="nav-icon">💰</span>
+                    <span class="nav-label">Caja Diaria</span>
+                </button>
+                <button class="nav-item" data-view="reportes">
+                    <span class="nav-icon">📊</span>
+                    <span class="nav-label">Reportes y Métricas</span>
+                </button>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="server-status">
+                    <span class="status-dot online"></span>
+                    <span class="status-text">Servidor POS Activo</span>
+                </div>
+                <div class="pos-date-time" id="pos-clock">--:--:--</div>
+            </div>
+        </aside>
+
+        <!-- CONTENIDO PRINCIPAL -->
+        <main class="main-content">
+            
+            <!-- HEADER DE APLICACIÓN -->
+            <header class="app-header">
+                <div class="header-left">
+                    <h1 id="module-title">Punto de Venta — Mostrador</h1>
+                    <span class="module-subtitle" id="module-subtitle">Registro de operaciones en mostrador y cobro rápido</span>
+                </div>
+                <div class="header-right">
+                    <div class="caja-badge-card" id="header-caja-badge">
+                        <span class="indicator-dot open"></span>
+                        <div class="caja-badge-info">
+                            <span class="badge-label">Estado de Caja</span>
+                            <span class="badge-value" id="header-caja-total">Efectivo: $ ...</span>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- VISTA 1: VENTAS (MOSTRADOR) -->
+            <section id="view-ventas" class="pos-view active">
+                <div class="ventas-grid">
+                    
+                    <!-- Columna Izquierda: Búsqueda y Catálogo -->
+                    <div class="catalog-panel">
+                        <div class="catalog-search-bar">
+                            <div class="search-input-wrapper">
+                                <span class="search-icon">🔍</span>
+                                <input type="text" id="pos-search-input" placeholder="Buscar por nombre o código de barras (F2)..." autocomplete="off">
+                                <button id="btn-clear-search" class="btn-clear" title="Limpiar">✕</button>
+                            </div>
+                        </div>
+
+                        <!-- Filtros por Categoría (Chips) -->
+                        <div class="category-chips" id="category-chips">
+                            <button class="chip-item active" data-cat="">Todos</button>
+                            <button class="chip-item" data-cat="1">Bebidas</button>
+                            <button class="chip-item" data-cat="2">Almacén</button>
+                            <button class="chip-item" data-cat="3">Lácteos/Fiambres</button>
+                            <button class="chip-item" data-cat="4">Panadería</button>
+                            <button class="chip-item" data-cat="5">Verdulería</button>
+                            <button class="chip-item" data-cat="6">Kiosco</button>
+                            <button class="chip-item" data-cat="7">Limpieza</button>
+                            <button class="chip-item" data-cat="8">Perfumería</button>
+                        </div>
+
+                        <!-- Grilla de Productos Rápidos -->
+                        <div class="products-grid-scroll" id="products-catalog-grid">
+                            <div class="loading-spinner">Cargando catálogo...</div>
+                        </div>
+                    </div>
+
+                    <!-- Columna Derecha: Terminal del Carrito y Total -->
+                    <div class="cart-panel">
+                        <div class="cart-header">
+                            <div class="cart-title-row">
+                                <h3>Carrito de Compras</h3>
+                                <button id="btn-vaciar-carrito" class="btn-text-danger" title="Vaciar todos los productos">Vaciar</button>
+                            </div>
+
+                            <!-- Selector de Cliente para la Venta -->
+                            <div class="client-selector-box">
+                                <label for="venta-cliente-select">Cliente:</label>
+                                <select id="venta-cliente-select">
+                                    <option value="1">Consumidor Final</option>
+                                    <!-- Se llenan dinámicamente -->
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Tabla del Carrito -->
+                        <div class="cart-table-wrapper">
+                            <table class="cart-table">
+                                <thead>
+                                    <tr>
+                                        <th>Producto</th>
+                                        <th>Cant / Peso</th>
+                                        <th>P. Unit</th>
+                                        <th>Subtotal</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="cart-table-body">
+                                    <tr class="cart-empty-row">
+                                        <td colspan="5">El carrito está vacío.<br><small>Selecciona o busca productos a la izquierda.</small></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Resumen Financiero y Botón de Cobro -->
+                        <div class="cart-summary">
+                            <div class="summary-line">
+                                <span>Subtotal:</span>
+                                <span id="cart-subtotal" class="num">$ 0,00</span>
+                            </div>
+                            <div class="summary-line discount-line">
+                                <span>Descuento global:</span>
+                                <div class="discount-input-wrap">
+                                    <span>$</span>
+                                    <input type="text" id="cart-discount-input" value="0,00" placeholder="0,00">
+                                </div>
+                            </div>
+                            <div class="summary-total-card">
+                                <span class="total-label">TOTAL A COBRAR:</span>
+                                <span id="cart-total" class="total-amount">$ 0,00</span>
+                            </div>
+
+                            <button id="btn-abrir-cobro" class="btn-checkout" disabled>
+                                <span>COBRAR (F4)</span>
+                                <span class="arrow">➔</span>
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
+            </section>
+
+            <!-- VISTA 2: PRODUCTOS Y STOCK -->
+            <section id="view-productos" class="pos-view">
+                <div class="view-card">
+                    <div class="card-toolbar">
+                        <div class="toolbar-left">
+                            <input type="text" id="filter-prod-text" class="input-text" placeholder="Filtrar por nombre o código...">
+                            <select id="filter-prod-cat" class="input-select">
+                                <option value="">Todas las categorías</option>
+                            </select>
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="filter-prod-stock-bajo">
+                                <span>Solo stock bajo</span>
+                            </label>
+                        </div>
+                        <div class="toolbar-right">
+                            <span class="count-badge" id="prod-total-count">0 productos</span>
+                        </div>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Producto</th>
+                                    <th>Categoría</th>
+                                    <th>Código</th>
+                                    <th>Tipo Venta</th>
+                                    <th>Precio Venta</th>
+                                    <th>Stock Actual</th>
+                                    <th>Stock Mín.</th>
+                                    <th>Estado</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="table-productos-body">
+                                <tr><td colspan="10" class="text-center">Cargando inventario...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- VISTA 3: CLIENTES Y FIADOS -->
+            <section id="view-clientes" class="pos-view">
+                <div class="clientes-layout">
+                    <!-- Padrón de Clientes -->
+                    <div class="view-card clientes-list-card">
+                        <div class="card-toolbar">
+                            <h3 style="margin:0;">Padrón de Clientes</h3>
+                            <input type="text" id="filter-cliente-text" class="input-text" placeholder="Buscar cliente por nombre...">
+                        </div>
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Nombre</th>
+                                        <th>Teléfono</th>
+                                        <th>Saldo Deudor</th>
+                                        <th>Límite Crédito</th>
+                                        <th>Disponible</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="table-clientes-body">
+                                    <tr><td colspan="6" class="text-center">Cargando clientes...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Ficha y Movimientos del Cliente Seleccionado -->
+                    <div class="view-card cliente-detail-card" id="cliente-detail-panel">
+                        <div class="detail-header">
+                            <div>
+                                <h3 id="detail-cli-nombre">Seleccione un cliente</h3>
+                                <span id="detail-cli-tel" class="text-muted">Tel: -</span>
+                            </div>
+                            <button id="btn-cobrar-deuda" class="btn btn-success" disabled>💰 Registrar Cobro</button>
+                        </div>
+
+                        <div class="detail-kpis">
+                            <div class="kpi-box red">
+                                <span class="label">Deuda Actual</span>
+                                <span class="val" id="detail-cli-saldo">$ 0,00</span>
+                            </div>
+                            <div class="kpi-box blue">
+                                <span class="label">Límite de Fiado</span>
+                                <span class="val" id="detail-cli-limite">$ 0,00</span>
+                            </div>
+                            <div class="kpi-box green">
+                                <span class="label">Crédito Libre</span>
+                                <span class="val" id="detail-cli-disponible">$ 0,00</span>
+                            </div>
+                        </div>
+
+                        <h4 style="margin: 15px 0 8px;">Historial de Cuenta Corriente</h4>
+                        <div class="table-responsive" style="max-height: 320px;">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Fecha</th>
+                                        <th>Tipo</th>
+                                        <th>Monto</th>
+                                        <th>Saldo Resultante</th>
+                                        <th>Descripción</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="table-cli-movs-body">
+                                    <tr><td colspan="5" class="text-center">Seleccione un cliente para ver su historial.</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- VISTA 4: CAJA DIARIA -->
+            <section id="view-caja" class="pos-view">
+                <div class="caja-grid-dashboard">
+                    
+                    <!-- Tarjeta de Estado y Resumen -->
+                    <div class="view-card caja-summary-card">
+                        <div class="caja-header-row">
+                            <div>
+                                <h3>Arqueo y Movimientos de Caja</h3>
+                                <span class="text-muted" id="caja-fecha-apertura">Apertura: Hoy</span>
+                            </div>
+                            <div class="caja-status-pill open" id="caja-status-pill">
+                                🟢 CAJA ABIERTA
+                            </div>
+                        </div>
+
+                        <div class="caja-numbers-grid">
+                            <div class="caja-stat-item">
+                                <span class="stat-name">Fondo Inicial:</span>
+                                <span class="stat-val" id="caja-stat-inicial">$ 0,00</span>
+                            </div>
+                            <div class="caja-stat-item">
+                                <span class="stat-name">Total Ventas (Todos los medios):</span>
+                                <span class="stat-val text-primary" id="caja-stat-ventas">$ 0,00</span>
+                            </div>
+                            <div class="caja-stat-item">
+                                <span class="stat-name">(+) Ingresos manuales:</span>
+                                <span class="stat-val text-success" id="caja-stat-ingresos">$ 0,00</span>
+                            </div>
+                            <div class="caja-stat-item">
+                                <span class="stat-name">(-) Gastos de caja:</span>
+                                <span class="stat-val text-danger" id="caja-stat-gastos">$ 0,00</span>
+                            </div>
+                            <div class="caja-stat-item">
+                                <span class="stat-name">(-) Retiros de dinero:</span>
+                                <span class="stat-val text-danger" id="caja-stat-retiros">$ 0,00</span>
+                            </div>
+                            <div class="caja-stat-item highlight">
+                                <span class="stat-name">EFECTIVO ESPERADO EN CAJÓN:</span>
+                                <span class="stat-val text-bold" id="caja-stat-esperado">$ 0,00</span>
+                            </div>
+                        </div>
+
+                        <!-- Acciones de Caja -->
+                        <div class="caja-actions-bar">
+                            <button id="btn-caja-ingreso" class="btn btn-outline-success">+ Ingreso</button>
+                            <button id="btn-caja-retiro" class="btn btn-outline-danger">- Retiro</button>
+                            <button id="btn-caja-gasto" class="btn btn-outline-danger">- Gasto</button>
+                            <button id="btn-caja-arqueo" class="btn btn-primary">⚖ Arqueo de Efectivo</button>
+                            <button id="btn-caja-cerrar" class="btn btn-danger">🔒 Cerrar Caja</button>
+                            <button id="btn-caja-abrir" class="btn btn-success" style="display:none;">🔓 Abrir Caja</button>
+                        </div>
+                    </div>
+
+                    <!-- Tabla de Movimientos del Día -->
+                    <div class="view-card">
+                        <h3 style="margin-bottom:12px;">Auditoría de Movimientos de la Jornada</h3>
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Hora</th>
+                                        <th>Tipo</th>
+                                        <th>Medio</th>
+                                        <th>Monto</th>
+                                        <th>Motivo / Comprobante</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="table-caja-movs-body">
+                                    <tr><td colspan="5" class="text-center">Cargando movimientos de caja...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                </div>
+            </section>
+
+            <!-- VISTA 5: REPORTES Y MÉTRICAS -->
+            <section id="view-reportes" class="pos-view">
+                <div class="reportes-container">
+                    
+                    <!-- Selector de Período -->
+                    <div class="periodo-selector-card">
+                        <div class="periodo-tabs" id="periodo-tabs">
+                            <button class="period-tab active" data-period="hoy">Hoy</button>
+                            <button class="period-tab" data-period="semana">Últimos 7 Días</button>
+                            <button class="period-tab" data-period="mes">Este Mes</button>
+                            <button class="period-tab" data-period="anio">Este Año</button>
+                        </div>
+                        <span class="text-muted" id="reporte-periodo-desc">Ventas acumuladas de la jornada en curso</span>
+                    </div>
+
+                    <!-- Tarjetas KPIs -->
+                    <div class="kpi-metrics-grid">
+                        <div class="metric-card">
+                            <div class="metric-icon green">💵</div>
+                            <div class="metric-data">
+                                <span class="metric-title">Ventas Totales</span>
+                                <span class="metric-val" id="rep-kpi-total">$ 0,00</span>
+                            </div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-icon blue">🧾</div>
+                            <div class="metric-data">
+                                <span class="metric-title">Cantidad de Ventas</span>
+                                <span class="metric-val" id="rep-kpi-cant">0</span>
+                            </div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-icon orange">📊</div>
+                            <div class="metric-data">
+                                <span class="metric-title">Ticket Promedio</span>
+                                <span class="metric-val" id="rep-kpi-promedio">$ 0,00</span>
+                            </div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-icon purple">📦</div>
+                            <div class="metric-data">
+                                <span class="metric-title">Despacho</span>
+                                <span class="metric-val" id="rep-kpi-articulos">0 unidades/g</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Gráficos y Tablas de Reportes -->
+                    <div class="reports-two-cols">
+                        
+                        <!-- Ventas por Medio de Pago -->
+                        <div class="view-card">
+                            <h3 style="margin-bottom:12px;">Ventas por Medio de Pago</h3>
+                            <div id="rep-medios-list" class="medios-bars-wrapper">
+                                <!-- Barras generadas por JS -->
+                            </div>
+                        </div>
+
+                        <!-- Top 5 Productos más Vendidos -->
+                        <div class="view-card">
+                            <h3 style="margin-bottom:12px;">Top Productos Más Vendidos</h3>
+                            <div class="table-responsive">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Producto</th>
+                                            <th>Cant / Peso</th>
+                                            <th>Total</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="table-rep-top-body">
+                                        <!-- Generado por JS -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <!-- Historial de Ventas y Opción de Anulación -->
+                    <div class="view-card" style="margin-top:20px;">
+                        <h3 style="margin-bottom:12px;">Historial de Ventas Recientes</h3>
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>N° Venta</th>
+                                        <th>Fecha / Hora</th>
+                                        <th>Cliente</th>
+                                        <th>Total</th>
+                                        <th>Medios de Pago</th>
+                                        <th>Estado</th>
+                                        <th>Acción</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="table-rep-ventas-body">
+                                    <tr><td colspan="7" class="text-center">Cargando ventas...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- ================================================================= -->
+    <!-- VENTANAS MODALES EMERGENTES                                       -->
+    <!-- ================================================================= -->
+
+    <!-- 1. MODAL PRODUCTO PESABLE -->
+    <div id="modal-peso" class="pos-modal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 id="modal-peso-title">Ingresar Peso del Producto</h3>
+                <button class="btn-close-modal" data-modal="modal-peso">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="peso-info-box">
+                    <span id="modal-peso-producto-nombre" class="peso-prod-name">Queso Cremoso</span>
+                    <span id="modal-peso-precio-kg" class="peso-precio-kg">$ 8.500,00 / kg</span>
+                </div>
+                <div class="form-group" style="margin-top:15px;">
+                    <label for="modal-peso-input">Peso a despachar (en gramos o kilogramos):</label>
+                    <div class="input-with-unit">
+                        <input type="text" id="modal-peso-input" placeholder="ej. 500g o 1,5kg" autofocus>
+                    </div>
+                    <small class="text-muted">Ejemplos válidos: <code>250</code> (gramos), <code>500g</code>, <code>1.5kg</code>, <code>1,250</code></small>
+                </div>
+                <div class="peso-subtotal-preview">
+                    <span>Subtotal estimado:</span>
+                    <strong id="modal-peso-subtotal-calc">$ 0,00</strong>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-modal="modal-peso">Cancelar</button>
+                <button id="btn-confirmar-peso" class="btn btn-primary">Agregar al Carrito</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. MODAL DE COBRO (CHECKOUT) -->
+    <div id="modal-cobro" class="pos-modal">
+        <div class="modal-card modal-lg">
+            <div class="modal-header">
+                <h3>Finalizar Venta — Pasarela de Cobro</h3>
+                <button class="btn-close-modal" data-modal="modal-cobro">✕</button>
+            </div>
+            <div class="modal-body cobro-body-grid">
+                
+                <!-- Columna Izquierda: Medios de Pago -->
+                <div class="cobro-methods-col">
+                    <label class="section-label">Seleccione Forma de Pago:</label>
+                    <div class="payment-tabs" id="payment-tabs">
+                        <button class="pay-tab active" data-medio="EFECTIVO">💵 Efectivo</button>
+                        <button class="pay-tab" data-medio="DEBITO">💳 Débito</button>
+                        <button class="pay-tab" data-medio="TRANSFERENCIA">🏦 Transferencia</button>
+                        <button class="pay-tab" data-medio="MERCADO_PAGO">📱 Mercado Pago</button>
+                        <button class="pay-tab" data-medio="FIADO">📝 Fiado (Cta. Cte.)</button>
+                        <button class="pay-tab" data-medio="MIXTO">🔀 Pago Mixto</button>
+                    </div>
+
+                    <!-- Panel Específico: Efectivo -->
+                    <div id="pay-panel-efectivo" class="pay-detail-panel active">
+                        <div class="form-group">
+                            <label for="cobro-efectivo-recibido">Dinero Recibido del Cliente:</label>
+                            <div class="input-currency-wrap">
+                                <span>$</span>
+                                <input type="text" id="cobro-efectivo-recibido" placeholder="0,00">
+                            </div>
+                        </div>
+                        <div class="vuelto-display-card" id="vuelto-card">
+                            <span class="vuelto-label">VUELTO A ENTREGAR:</span>
+                            <span class="vuelto-amount" id="cobro-vuelto-amount">$ 0,00</span>
+                        </div>
+                    </div>
+
+                    <!-- Panel Específico: Fiado -->
+                    <div id="pay-panel-fiado" class="pay-detail-panel">
+                        <div class="fiado-status-box" id="fiado-status-box">
+                            <div class="fiado-line"><strong>Cliente:</strong> <span id="fiado-cli-name">-</span></div>
+                            <div class="fiado-line"><strong>Saldo Actual:</strong> <span id="fiado-cli-saldo">$ 0,00</span></div>
+                            <div class="fiado-line"><strong>Límite de Crédito:</strong> <span id="fiado-cli-limite">$ 0,00</span></div>
+                            <div class="fiado-line highlight"><strong>Crédito Disponible:</strong> <span id="fiado-cli-disponible">$ 0,00</span></div>
+                        </div>
+                        <div id="fiado-alert-error" class="alert-box danger" style="display:none; margin-top:10px;">
+                            ⚠ El cliente no tiene crédito disponible suficiente para esta compra.
+                        </div>
+                    </div>
+
+                    <!-- Panel Específico: Pago Mixto -->
+                    <div id="pay-panel-mixto" class="pay-detail-panel">
+                        <p class="text-muted" style="margin-top:0;">Distribuya el monto exacto de la venta entre varios medios:</p>
+                        <div class="mixto-inputs-grid">
+                            <div class="mixto-row">
+                                <span>💵 Efectivo:</span>
+                                <input type="text" id="mixto-efectivo" class="mixto-input" placeholder="0,00">
+                            </div>
+                            <div class="mixto-row">
+                                <span>💳 Débito:</span>
+                                <input type="text" id="mixto-debito" class="mixto-input" placeholder="0,00">
+                            </div>
+                            <div class="mixto-row">
+                                <span>🏦 Transf.:</span>
+                                <input type="text" id="mixto-transferencia" class="mixto-input" placeholder="0,00">
+                            </div>
+                            <div class="mixto-row">
+                                <span>📱 MP / QR:</span>
+                                <input type="text" id="mixto-mp" class="mixto-input" placeholder="0,00">
+                            </div>
+                            <div class="mixto-row">
+                                <span>📝 Fiado:</span>
+                                <input type="text" id="mixto-fiado" class="mixto-input" placeholder="0,00">
+                            </div>
+                        </div>
+                        <div class="mixto-balance-card" id="mixto-balance-card">
+                            <span>Suma de pagos: <strong id="mixto-suma">$ 0,00</strong></span>
+                            <span>Diferencia por cubrir: <strong id="mixto-diferencia" class="text-danger">$ 0,00</strong></span>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Columna Derecha: Resumen de Venta -->
+                <div class="cobro-summary-col">
+                    <div class="summary-box-receipt">
+                        <span class="label">TOTAL DE LA VENTA</span>
+                        <span class="amount" id="cobro-total-display">$ 0,00</span>
+                        <div class="items-count-badge" id="cobro-items-count">0 artículos</div>
+                    </div>
+                    <div class="cobro-warning-box" id="cobro-validation-msg" style="display:none;"></div>
+                </div>
+
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-modal="modal-cobro">Volver al Carrito</button>
+                <button id="btn-confirmar-venta" class="btn btn-primary btn-lg">✓ Confirmar Venta</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. MODAL COMPROBANTE / RECIBO DE ÉXITO -->
+    <div id="modal-ticket" class="pos-modal">
+        <div class="modal-card modal-ticket-card">
+            <div class="ticket-header">
+                <div class="ticket-success-icon">✓</div>
+                <h3>Venta Registrada con Éxito</h3>
+                <span class="ticket-number" id="ticket-numero">Venta #000000</span>
+            </div>
+            <div class="ticket-body">
+                <div class="ticket-row"><span>Fecha:</span> <span id="ticket-fecha">--/--/----</span></div>
+                <div class="ticket-row"><span>Cliente:</span> <span id="ticket-cliente">Consumidor final</span></div>
+                <hr class="ticket-divider">
+                <div class="ticket-items-list" id="ticket-items"></div>
+                <hr class="ticket-divider">
+                <div class="ticket-row total"><span>TOTAL:</span> <strong id="ticket-total">$ 0,00</strong></div>
+                <div class="ticket-row"><span>Medio(s) de pago:</span> <span id="ticket-medios">-</span></div>
+                <div class="ticket-row" id="ticket-vuelto-row" style="display:none;"><span>Vuelto entregado:</span> <span id="ticket-vuelto">$ 0,00</span></div>
+            </div>
+            <div class="modal-footer" style="justify-content:center;">
+                <button id="btn-nuevo-ticket" class="btn btn-primary">Nueva Venta</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 4. MODAL AJUSTE DE STOCK -->
+    <div id="modal-stock" class="pos-modal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 id="modal-stock-title">Ingreso / Ajuste de Stock</h3>
+                <button class="btn-close-modal" data-modal="modal-stock">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Producto:</label>
+                    <input type="text" id="modal-stock-prod-name" class="input-text" readonly>
+                </div>
+                <div class="form-group">
+                    <label>Stock actual:</label>
+                    <input type="text" id="modal-stock-actual" class="input-text" readonly>
+                </div>
+                <div class="form-group">
+                    <label for="modal-stock-delta">Cantidad a sumar o restar (+/-):</label>
+                    <input type="number" id="modal-stock-delta" class="input-text" placeholder="ej. 10 para ingreso, -2 para rotura">
+                    <small class="text-muted">Si es producto pesable, ingrese la cantidad en <strong>gramos</strong> (ej. 5000 para 5 kg).</small>
+                </div>
+                <div class="form-group">
+                    <label for="modal-stock-motivo">Motivo:</label>
+                    <input type="text" id="modal-stock-motivo" class="input-text" placeholder="Ingreso de proveedor, conteo físico, merma...">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-modal="modal-stock">Cancelar</button>
+                <button id="btn-confirmar-stock" class="btn btn-primary">Guardar Ajuste</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 5. MODAL COBRO DE DEUDA A CLIENTE -->
+    <div id="modal-cobro-cliente" class="pos-modal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3>Registrar Cobro de Cuenta Corriente</h3>
+                <button class="btn-close-modal" data-modal="modal-cobro-cliente">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Cliente:</label>
+                    <input type="text" id="cobro-cli-nombre" class="input-text" readonly>
+                </div>
+                <div class="form-group">
+                    <label>Deuda total actual:</label>
+                    <input type="text" id="cobro-cli-deuda-actual" class="input-text" readonly>
+                </div>
+                <div class="form-group">
+                    <label for="cobro-cli-monto">Monto a cobrar en pesos:</label>
+                    <div class="input-currency-wrap">
+                        <span>$</span>
+                        <input type="text" id="cobro-cli-monto" placeholder="0,00">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="cobro-cli-medio">Medio de Cobro:</label>
+                    <select id="cobro-cli-medio" class="input-select">
+                        <option value="EFECTIVO">Efectivo</option>
+                        <option value="DEBITO">Débito</option>
+                        <option value="TRANSFERENCIA">Transferencia</option>
+                        <option value="MERCADO_PAGO">Mercado Pago / QR</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-modal="modal-cobro-cliente">Cancelar</button>
+                <button id="btn-confirmar-cobro-cli" class="btn btn-success">Registrar Cobro</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 6. MODAL MOVIMIENTO MANUAL DE CAJA (Ingreso/Retiro/Gasto) -->
+    <div id="modal-mov-caja" class="pos-modal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 id="modal-mov-caja-title">Movimiento de Caja</h3>
+                <button class="btn-close-modal" data-modal="modal-mov-caja">✕</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="modal-mov-caja-tipo" value="INGRESO">
+                <div class="form-group">
+                    <label for="modal-mov-caja-monto">Monto en pesos:</label>
+                    <div class="input-currency-wrap">
+                        <span>$</span>
+                        <input type="text" id="modal-mov-caja-monto" placeholder="0,00">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="modal-mov-caja-motivo">Motivo / Concepto:</label>
+                    <input type="text" id="modal-mov-caja-motivo" class="input-text" placeholder="ej. Cambio de billetes, pago de flete, retiro del dueño...">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-modal="modal-mov-caja">Cancelar</button>
+                <button id="btn-confirmar-mov-caja" class="btn btn-primary">Registrar Movimiento</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 7. MODAL ARQUEO Y CIERRE DE CAJA -->
+    <div id="modal-cierre-caja" class="pos-modal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3>Arqueo y Cierre de Caja</h3>
+                <button class="btn-close-modal" data-modal="modal-cierre-caja">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="arqueo-kpi-card">
+                    <span class="label">Efectivo Teórico Esperado en Caja:</span>
+                    <span class="amount" id="arqueo-esperado">$ 0,00</span>
+                </div>
+                <div class="form-group" style="margin-top:15px;">
+                    <label for="arqueo-contado-input">Efectivo Físico Contado:</label>
+                    <div class="input-currency-wrap">
+                        <span>$</span>
+                        <input type="text" id="arqueo-contado-input" placeholder="0,00">
+                    </div>
+                </div>
+                <div class="arqueo-diff-box" id="arqueo-diff-box">
+                    <span class="diff-label">Diferencia:</span>
+                    <span class="diff-val" id="arqueo-diff-val">$ 0,00</span>
+                    <span class="diff-status" id="arqueo-diff-desc">Caja Cuadrada</span>
+                </div>
+                <div class="form-group" style="margin-top:10px;">
+                    <label for="arqueo-obs">Observaciones de Cierre:</label>
+                    <input type="text" id="arqueo-obs" class="input-text" placeholder="Observaciones opcionales...">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-modal="modal-cierre-caja">Cancelar</button>
+                <button id="btn-confirmar-cierre-caja" class="btn btn-danger">Confirmar Cierre de Caja</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 8. MODAL ANULAR VENTA -->
+    <div id="modal-anular-venta" class="pos-modal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3>Anulación de Venta</h3>
+                <button class="btn-close-modal" data-modal="modal-anular-venta">✕</button>
+            </div>
+            <div class="modal-body">
+                <p>¿Está seguro de que desea anular la <strong id="anular-venta-numero">Venta #...</strong>?</p>
+                <div class="alert-box warning">
+                    Al anular la venta, se reincorporará automáticamente el stock al inventario, se contrarrestará el impacto en caja y se compensará el fiado si corresponde.
+                </div>
+                <div class="form-group" style="margin-top:12px;">
+                    <label for="anular-venta-motivo">Motivo de Anulación (obligatorio):</label>
+                    <input type="text" id="anular-venta-motivo" class="input-text" placeholder="Error de cobro, devolución del cliente, etc.">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-modal="modal-anular-venta">Cancelar</button>
+                <button id="btn-confirmar-anulacion" class="btn btn-danger">Confirmar Anulación</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CONTENEDOR DE TOASTS FLOTANTES -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- SCRIPTS -->
+    <script src="{{ url_for('static', filename='js/almacen_demo.js') }}"></script>
+</body>
+</html>
